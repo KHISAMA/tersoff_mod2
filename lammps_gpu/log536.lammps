@@ -1,0 +1,488 @@
+LAMMPS (29 Oct 2020)
+  using 1 OpenMP thread(s) per MPI task
+package gpu 1
+package omp 0
+using multi-threaded neighbor list subroutines
+package omp 1
+using multi-threaded neighbor list subroutines
+package gpu 1
+# tersoff_mod
+
+units		    metal
+atom_style	    atomic
+atom_modify id yes
+
+read_data	    data.zinit
+Reading data file ...
+  orthogonal box = (-50.000000 -50.000000 -50.000000) to (50.000000 50.000000 50.000000)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  536 atoms
+  reading velocities ...
+  536 velocities
+  read_data CPU = 0.005 seconds
+
+region 1 block -50.0 50.0 -50.0 50.0 -50.0 50.0
+
+neighbor	        2.0 bin
+neigh_modify	    delay 5 every 1
+
+pair_style	    hybrid/overlay tersoff/mod/gpu lj/cut/gpu 11.795
+pair_coeff	    * * tersoff/mod/gpu C-Co.tersoff_mod C C Co
+pair_coeff      1*2 2 lj/cut/gpu 0.0024 3.37
+
+# 0.5 fs
+timestep	0.0005
+
+group    carbon type 1 2
+456 atoms in group carbon
+group    metal type 3
+80 atoms in group metal
+
+
+
+variable tmp equal 1550
+variable abg equal 6.02214076*10e23
+variable boltz equal 1.380649*10e-23
+variable vel equal -sqrt(3*${tmp}/12.01*${abg}*${boltz})*0.01
+variable vel equal -sqrt(3*1550/12.01*${abg}*${boltz})*0.01
+variable vel equal -sqrt(3*1550/12.01*6.02214076e+24*${boltz})*0.01
+variable vel equal -sqrt(3*1550/12.01*6.02214076e+24*1.380649e-22)*0.01
+variable tar equal random(-50,50,56373)
+
+fix 1 metal nvt temp 1550 1550 $(100.0*dt)
+fix 1 metal nvt temp 1550 1550 0.050000000000000002776
+fix 2 carbon nve
+fix 3 all recenter INIT INIT INIT
+
+compute 1 carbon coord/atom cutoff 2.0 group carbon
+compute 2 carbon coord/atom cutoff 3.0 group metal
+
+dump		1 all atom 40000 pos.lammpstrj
+dump		2 all custom 40000 vel_lammps.txt  id vx vy vz
+dump    3 all custom 40000 force_lammps.txt id fx fy fz
+dump    4 all custom 80000 cood.txt id c_1 c_2
+
+
+run 0
+WARNING: Increasing communication cutoff for GPU style (src/GPU/pair_tersoff_mod_gpu.cpp:251)
+No /omp style for force computation currently active
+Neighbor list info ...
+  update every 1 steps, delay 5 steps, check yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 13.795
+  ghost atom cutoff = 13.795
+  binsize = 6.8975, bins = 15 15 15
+  2 neighbor lists, perpetual/occasional/extra = 0 2 0
+  (1) compute coord/atom, occasional
+      attributes: full, newton off, omp
+      pair build: full/bin/atomonly/omp
+      stencil: full/bin/3d
+      bin: standard
+  (2) compute coord/atom, occasional
+      attributes: full, newton off, omp
+      pair build: full/bin/atomonly/omp
+      stencil: full/bin/3d
+      bin: standard
+WARNING: Communication cutoff adjusted to 13.795 (src/comm.cpp:677)
+Per MPI rank memory allocation (min/avg/max) = 8.808 | 8.808 | 8.808 Mbytes
+Step Temp E_pair E_mol TotEng Press 
+       0    1502.7476    -3470.443            0   -3366.5218    66.964016 
+Loop time of 3.09944e-06 on 1 procs for 0 steps with 536 atoms
+
+32.3% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 3.099e-06  |            |       |100.00
+
+Nlocal:        536.000 ave         536 max         536 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:        0.00000 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:        0.00000 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:      14752.0 ave       14752 max       14752 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 14752
+Ave neighs/atom = 27.522388
+Neighbor list builds = 0
+Dangerous builds = 0
+
+group iclus type 2
+0 atoms in group iclus
+variable c1 atom "c_1 + c_2 == 0"
+group g1 variable c1
+80 atoms in group g1
+group g2 intersect carbon g1
+0 atoms in group g2
+group g3 subtract iclus g1
+0 atoms in group g3
+variable nclus equal count(g2)
+
+
+thermo $(400*100)
+thermo 40000
+thermo_style custom step temp etotal pe ke press v_nclus
+
+
+variable flag equal 0
+
+label  loopa
+variable a loop 5
+
+ group g1 delete
+ group g2 delete
+ group g3 delete
+ group iclus delete
+
+
+ group iclus type 2
+0 atoms in group iclus
+ variable c1 atom "c_1 + c_2 == 0"
+ group g1 variable c1
+80 atoms in group g1
+ group g2 intersect carbon g1
+0 atoms in group g2
+ group g3 subtract iclus g1
+0 atoms in group g3
+
+ variable nclus equal count(g2)
+
+
+
+ if "${nclus} < 1 && ${flag} == 0" then  "fix 4 carbon deposit 1 2 1 294894 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}"  "run 80000"  "unfix 4"  "variable flag equal 1"  elif "${nclus} < 1"   "compute 3 g3 property/atom id"   "variable foo atom c_3"   "compute oneid g3 reduce sum v_foo"   "variable id equal c_oneid"   "thermo_style custom step v_id"   "run 0"   "set atom ${id} type 1"   "fix 4 carbon deposit 1 2 1 29494 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}"   "thermo_style custom step temp etotal pe ke press v_nclus"   "run 80000"   "unfix 4"   "uncompute 3"   "variable foo delete"   "uncompute oneid"   "variable id delete"   else   "run 80000"
+fix 4 carbon deposit 1 2 1 294894 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}
+fix 4 carbon deposit 1 2 1 294894 region 1 near 10 vz -5.67377442406415 ${vel} target ${tar} ${tar} ${tar}
+fix 4 carbon deposit 1 2 1 294894 region 1 near 10 vz -5.67377442406415 -5.67377442406415 target ${tar} ${tar} ${tar}
+fix 4 carbon deposit 1 2 1 294894 region 1 near 10 vz -5.67377442406415 -5.67377442406415 target -33.1418037414551 ${tar} ${tar}
+fix 4 carbon deposit 1 2 1 294894 region 1 near 10 vz -5.67377442406415 -5.67377442406415 target -33.1418037414551 7.6092541217804 ${tar}
+fix 4 carbon deposit 1 2 1 294894 region 1 near 10 vz -5.67377442406415 -5.67377442406415 target -33.1418037414551 7.6092541217804 34.7578406333923
+run 80000
+No /omp style for force computation currently active
+WARNING: Communication cutoff adjusted to 13.795 (src/comm.cpp:677)
+Per MPI rank memory allocation (min/avg/max) = 8.808 | 8.808 | 8.808 Mbytes
+Step Temp TotEng PotEng KinEng Press v_nclus 
+       0    1502.7476   -3366.5218    -3470.443    103.92127    66.964016            0 
+   40000    1623.6381   -3382.4163   -3494.6976    112.28136    43.388768            0 
+   80000    1451.2774   -3409.1757   -3509.5376     100.3619    87.379698            0 
+Loop time of 21.67 on 1 procs for 80000 steps with 537 atoms
+
+Performance: 159.483 ns/day, 0.150 hours/ns, 3691.742 timesteps/s
+73.3% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 20.568     | 20.568     | 20.568     |   0.0 | 94.91
+Neigh   | 0.0096896  | 0.0096896  | 0.0096896  |   0.0 |  0.04
+Comm    | 0.01699    | 0.01699    | 0.01699    |   0.0 |  0.08
+Output  | 0.0065501  | 0.0065501  | 0.0065501  |   0.0 |  0.03
+Modify  | 0.97577    | 0.97577    | 0.97577    |   0.0 |  4.50
+Other   |            | 0.09297    |            |       |  0.43
+
+Nlocal:        537.000 ave         537 max         537 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:        1.00000 ave           1 max           1 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:        0.00000 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:      16750.0 ave       16750 max       16750 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 16750
+Ave neighs/atom = 31.191806
+Neighbor list builds = 932
+Dangerous builds = 0
+unfix 4
+variable flag equal 1
+
+
+
+
+next a
+jump SELF loopa
+variable a loop 5
+
+ group g1 delete
+ group g2 delete
+ group g3 delete
+ group iclus delete
+
+
+ group iclus type 2
+1 atoms in group iclus
+ variable c1 atom "c_1 + c_2 == 0"
+ group g1 variable c1
+81 atoms in group g1
+ group g2 intersect carbon g1
+1 atoms in group g2
+ group g3 subtract iclus g1
+0 atoms in group g3
+
+ variable nclus equal count(g2)
+
+
+
+ if "${nclus} < 1 && ${flag} == 0" then  "fix 4 carbon deposit 1 2 1 294894 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}"  "run 80000"  "unfix 4"  "variable flag equal 1"  elif "${nclus} < 1"   "compute 3 g3 property/atom id"   "variable foo atom c_3"   "compute oneid g3 reduce sum v_foo"   "variable id equal c_oneid"   "thermo_style custom step v_id"   "run 0"   "set atom ${id} type 1"   "fix 4 carbon deposit 1 2 1 29494 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}"   "thermo_style custom step temp etotal pe ke press v_nclus"   "run 80000"   "unfix 4"   "uncompute 3"   "variable foo delete"   "uncompute oneid"   "variable id delete"   else   "run 80000"
+run 80000
+No /omp style for force computation currently active
+WARNING: Communication cutoff adjusted to 13.795 (src/comm.cpp:677)
+Per MPI rank memory allocation (min/avg/max) = 8.808 | 8.808 | 8.808 Mbytes
+Step Temp TotEng PotEng KinEng Press v_nclus 
+   80000    1448.5698   -3409.1757   -3509.5376     100.3619    87.379698            1 
+  120000     1498.778   -3409.8285    -3513.669    103.84049   -6.6114297            1 
+  160000    1549.3618   -3405.4765   -3512.8216    107.34511    50.609476            1 
+Loop time of 21.8565 on 1 procs for 80000 steps with 537 atoms
+
+Performance: 158.122 ns/day, 0.152 hours/ns, 3660.233 timesteps/s
+73.1% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 20.768     | 20.768     | 20.768     |   0.0 | 95.02
+Neigh   | 0.0091984  | 0.0091984  | 0.0091984  |   0.0 |  0.04
+Comm    | 0.017038   | 0.017038   | 0.017038   |   0.0 |  0.08
+Output  | 0.006115   | 0.006115   | 0.006115   |   0.0 |  0.03
+Modify  | 0.96367    | 0.96367    | 0.96367    |   0.0 |  4.41
+Other   |            | 0.0923     |            |       |  0.42
+
+Nlocal:        537.000 ave         537 max         537 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:        0.00000 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:        0.00000 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:      16880.0 ave       16880 max       16880 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 16880
+Ave neighs/atom = 31.433892
+Neighbor list builds = 895
+Dangerous builds = 0
+
+
+
+
+next a
+jump SELF loopa
+variable a loop 5
+
+ group g1 delete
+ group g2 delete
+ group g3 delete
+ group iclus delete
+
+
+ group iclus type 2
+1 atoms in group iclus
+ variable c1 atom "c_1 + c_2 == 0"
+ group g1 variable c1
+81 atoms in group g1
+ group g2 intersect carbon g1
+1 atoms in group g2
+ group g3 subtract iclus g1
+0 atoms in group g3
+
+ variable nclus equal count(g2)
+
+
+
+ if "${nclus} < 1 && ${flag} == 0" then  "fix 4 carbon deposit 1 2 1 294894 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}"  "run 80000"  "unfix 4"  "variable flag equal 1"  elif "${nclus} < 1"   "compute 3 g3 property/atom id"   "variable foo atom c_3"   "compute oneid g3 reduce sum v_foo"   "variable id equal c_oneid"   "thermo_style custom step v_id"   "run 0"   "set atom ${id} type 1"   "fix 4 carbon deposit 1 2 1 29494 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}"   "thermo_style custom step temp etotal pe ke press v_nclus"   "run 80000"   "unfix 4"   "uncompute 3"   "variable foo delete"   "uncompute oneid"   "variable id delete"   else   "run 80000"
+run 80000
+No /omp style for force computation currently active
+WARNING: Communication cutoff adjusted to 13.795 (src/comm.cpp:677)
+Per MPI rank memory allocation (min/avg/max) = 8.808 | 8.808 | 8.808 Mbytes
+Step Temp TotEng PotEng KinEng Press v_nclus 
+  160000    1549.3618   -3405.4765   -3512.8216    107.34511    50.609476            1 
+  200000    1480.4119   -3419.9358   -3522.5038    102.56802    93.473982            1 
+  240000    1546.0736   -3407.6234   -3514.7407    107.11729   -50.487937            1 
+Loop time of 22.303 on 1 procs for 80000 steps with 537 atoms
+
+Performance: 154.957 ns/day, 0.155 hours/ns, 3586.962 timesteps/s
+72.9% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 21.207     | 21.207     | 21.207     |   0.0 | 95.09
+Neigh   | 0.0088801  | 0.0088801  | 0.0088801  |   0.0 |  0.04
+Comm    | 0.016567   | 0.016567   | 0.016567   |   0.0 |  0.07
+Output  | 0.0061963  | 0.0061963  | 0.0061963  |   0.0 |  0.03
+Modify  | 0.97131    | 0.97131    | 0.97131    |   0.0 |  4.36
+Other   |            | 0.0926     |            |       |  0.42
+
+Nlocal:        537.000 ave         537 max         537 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:        0.00000 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:        0.00000 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:      16736.0 ave       16736 max       16736 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 16736
+Ave neighs/atom = 31.165736
+Neighbor list builds = 865
+Dangerous builds = 0
+
+
+
+
+next a
+jump SELF loopa
+variable a loop 5
+
+ group g1 delete
+ group g2 delete
+ group g3 delete
+ group iclus delete
+
+
+ group iclus type 2
+1 atoms in group iclus
+ variable c1 atom "c_1 + c_2 == 0"
+ group g1 variable c1
+81 atoms in group g1
+ group g2 intersect carbon g1
+1 atoms in group g2
+ group g3 subtract iclus g1
+0 atoms in group g3
+
+ variable nclus equal count(g2)
+
+
+
+ if "${nclus} < 1 && ${flag} == 0" then  "fix 4 carbon deposit 1 2 1 294894 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}"  "run 80000"  "unfix 4"  "variable flag equal 1"  elif "${nclus} < 1"   "compute 3 g3 property/atom id"   "variable foo atom c_3"   "compute oneid g3 reduce sum v_foo"   "variable id equal c_oneid"   "thermo_style custom step v_id"   "run 0"   "set atom ${id} type 1"   "fix 4 carbon deposit 1 2 1 29494 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}"   "thermo_style custom step temp etotal pe ke press v_nclus"   "run 80000"   "unfix 4"   "uncompute 3"   "variable foo delete"   "uncompute oneid"   "variable id delete"   else   "run 80000"
+run 80000
+No /omp style for force computation currently active
+WARNING: Communication cutoff adjusted to 13.795 (src/comm.cpp:677)
+Per MPI rank memory allocation (min/avg/max) = 8.808 | 8.808 | 8.808 Mbytes
+Step Temp TotEng PotEng KinEng Press v_nclus 
+  240000    1546.0736   -3407.6234   -3514.7407    107.11729   -50.487937            1 
+  280000    1490.1371   -3420.2504   -3523.4922    103.24182   -27.144448            1 
+  320000    1489.2336   -3418.4827   -3521.6619    103.17923   -44.644891            1 
+Loop time of 22.1414 on 1 procs for 80000 steps with 537 atoms
+
+Performance: 156.088 ns/day, 0.154 hours/ns, 3613.137 timesteps/s
+73.2% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 21.039     | 21.039     | 21.039     |   0.0 | 95.02
+Neigh   | 0.0088897  | 0.0088897  | 0.0088897  |   0.0 |  0.04
+Comm    | 0.016101   | 0.016101   | 0.016101   |   0.0 |  0.07
+Output  | 0.0057759  | 0.0057759  | 0.0057759  |   0.0 |  0.03
+Modify  | 0.97873    | 0.97873    | 0.97873    |   0.0 |  4.42
+Other   |            | 0.09265    |            |       |  0.42
+
+Nlocal:        537.000 ave         537 max         537 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:        0.00000 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:        0.00000 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:      16786.0 ave       16786 max       16786 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 16786
+Ave neighs/atom = 31.258845
+Neighbor list builds = 877
+Dangerous builds = 0
+
+
+
+
+next a
+jump SELF loopa
+variable a loop 5
+
+ group g1 delete
+ group g2 delete
+ group g3 delete
+ group iclus delete
+
+
+ group iclus type 2
+1 atoms in group iclus
+ variable c1 atom "c_1 + c_2 == 0"
+ group g1 variable c1
+81 atoms in group g1
+ group g2 intersect carbon g1
+1 atoms in group g2
+ group g3 subtract iclus g1
+0 atoms in group g3
+
+ variable nclus equal count(g2)
+
+
+
+ if "${nclus} < 1 && ${flag} == 0" then  "fix 4 carbon deposit 1 2 1 294894 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}"  "run 80000"  "unfix 4"  "variable flag equal 1"  elif "${nclus} < 1"   "compute 3 g3 property/atom id"   "variable foo atom c_3"   "compute oneid g3 reduce sum v_foo"   "variable id equal c_oneid"   "thermo_style custom step v_id"   "run 0"   "set atom ${id} type 1"   "fix 4 carbon deposit 1 2 1 29494 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}"   "thermo_style custom step temp etotal pe ke press v_nclus"   "run 80000"   "unfix 4"   "uncompute 3"   "variable foo delete"   "uncompute oneid"   "variable id delete"   else   "run 80000"
+run 80000
+No /omp style for force computation currently active
+WARNING: Communication cutoff adjusted to 13.795 (src/comm.cpp:677)
+Per MPI rank memory allocation (min/avg/max) = 8.808 | 8.808 | 8.808 Mbytes
+Step Temp TotEng PotEng KinEng Press v_nclus 
+  320000    1489.2336   -3418.4827   -3521.6619    103.17923   -44.644891            1 
+  360000    1560.8251   -3419.3776   -3527.5169    108.13933   -6.9516019            1 
+  400000    1607.7952   -3420.4388   -3531.8324    111.39358    33.124801            1 
+Loop time of 22.3431 on 1 procs for 80000 steps with 537 atoms
+
+Performance: 154.678 ns/day, 0.155 hours/ns, 3580.517 timesteps/s
+72.3% CPU use with 1 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 21.25      | 21.25      | 21.25      |   0.0 | 95.11
+Neigh   | 0.0090606  | 0.0090606  | 0.0090606  |   0.0 |  0.04
+Comm    | 0.018926   | 0.018926   | 0.018926   |   0.0 |  0.08
+Output  | 0.008965   | 0.008965   | 0.008965   |   0.0 |  0.04
+Modify  | 0.96413    | 0.96413    | 0.96413    |   0.0 |  4.32
+Other   |            | 0.09219    |            |       |  0.41
+
+Nlocal:        537.000 ave         537 max         537 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:        1.00000 ave           1 max           1 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:        0.00000 ave           0 max           0 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+FullNghs:      16956.0 ave       16956 max       16956 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 16956
+Ave neighs/atom = 31.575419
+Neighbor list builds = 889
+Dangerous builds = 0
+
+
+
+
+next a
+jump SELF loopa
+label       break
+variable    a delete
+
+write_restart restart.tersoff
+System init for write_restart ...
+No /omp style for force computation currently active
+
+
+
+
+# run n_local_loop* n_pos_interval* n_frame
+
+
+
+Please see the log.cite file for references relevant to this simulation
+
+Total wall time: 0:01:50

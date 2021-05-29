@@ -1,0 +1,119 @@
+# tersoff_mod
+
+units		    metal
+atom_style	    atomic
+atom_modify id yes
+
+read_data	    data.zinit
+
+region 1 block -50.0 50.0 -50.0 50.0 -50.0 50.0
+
+neighbor	        2.0 bin
+neigh_modify	    delay 5 every 1
+
+pair_style	    hybrid/overlay tersoff/mod/gpu lj/cut/gpu 11.795
+pair_coeff	    * * tersoff/mod/gpu C-Co.tersoff_mod C C Co
+pair_coeff      1*2 2 lj/cut/gpu 0.0024 3.37
+
+# 0.5 fs
+timestep	0.0005
+
+group    carbon type 1 2
+group    metal type 3
+ 
+
+
+variable tmp equal 1550
+variable abg equal 6.02214076*10e23
+variable boltz equal 1.380649*10e-23
+variable vel equal -sqrt(3*${tmp}/12.01*${abg}*${boltz})*0.01
+variable tar equal random(-50,50,56373)
+
+fix 1 metal nvt temp 1550 1550 $(100.0*dt)
+fix 2 carbon nve
+fix 3 all recenter INIT INIT INIT
+
+compute 1 carbon coord/atom cutoff 2.0 group carbon
+compute 2 carbon coord/atom cutoff 3.0 group metal
+
+dump		1 all atom 40000 pos.lammpstrj
+dump		2 all custom 40000 vel_lammps.txt  id vx vy vz
+dump    3 all custom 40000 force_lammps.txt id fx fy fz
+dump    4 all custom 80000 cood.txt id c_1 c_2
+
+
+run 0
+
+group iclus type 2
+variable c1 atom "c_1 + c_2 == 0"
+group g1 variable c1
+group g2 intersect carbon g1
+group g3 subtract iclus g1
+variable nclus equal count(g2)
+
+
+thermo $(400*100)
+thermo_style custom step temp etotal pe ke press v_nclus
+
+
+variable flag equal 0
+
+label  loopa
+variable a loop 5
+
+ group g1 delete 
+ group g2 delete
+ group g3 delete
+ group iclus delete
+ 
+ 
+ group iclus type 2
+ variable c1 atom "c_1 + c_2 == 0"
+ group g1 variable c1
+ group g2 intersect carbon g1
+ group g3 subtract iclus g1
+ 
+ variable nclus equal count(g2)
+
+
+
+ if "${nclus} < 1 && ${flag} == 0" then &
+ "fix 4 carbon deposit 1 2 1 294894 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}" & 
+ "run 80000" &
+ "unfix 4" &
+ "variable flag equal 1" &
+ elif "${nclus} < 1" &
+  "compute 3 g3 property/atom id" &
+  "variable foo atom c_3" &
+  "compute oneid g3 reduce sum v_foo" &
+  "variable id equal c_oneid" &
+  "thermo_style custom step v_id" &
+  "run 0" &
+  "set atom ${id} type 1" & 
+  "fix 4 carbon deposit 1 2 1 29494 region 1 near 10 vz ${vel} ${vel} target ${tar} ${tar} ${tar}" & 
+  "thermo_style custom step temp etotal pe ke press v_nclus" &
+  "run 80000" &
+  "unfix 4" &
+  "uncompute 3" &
+  "variable foo delete" &
+  "uncompute oneid" &
+  "variable id delete" &
+  else &
+  "run 80000" 
+ 
+
+ 
+
+next a
+jump SELF loopa 
+label       break
+variable    a delete
+
+write_restart restart.tersoff
+
+
+
+
+# run n_local_loop* n_pos_interval* n_frame
+
+
