@@ -1,0 +1,126 @@
+# tersoff_mod
+
+# Number of free carbon atoms
+variable maxnclus equal 8
+
+# Temperature
+variable tmp equal 1200
+
+# Cell size
+variable cell equal 200.0
+
+# Seed value
+variable seed equal 56373
+
+units metal
+atom_style atomic
+read_data data.zinit
+
+neighbor	    0.5 bin
+neigh_modify	    delay 5 every 1
+
+pair_style	    hybrid/overlay tersoff/mod2 lj/cut 11.795
+pair_coeff	    * * tersoff/mod2 C-Co.tersoff_mod C C Co
+pair_coeff      1*2 2 lj/cut 0.0024 3.37
+
+# 0.5 fs
+timestep	0.0005
+
+group    carbon type 1 2
+group    metal type 3
+
+variable cell2 equal 0.5*${cell}
+region 1 block -${cell2} ${cell2} -${cell2} ${cell2} -${cell2} ${cell2}
+variable abg equal 6.02214076e23
+variable boltz equal 1.380649e-23
+variable vel equal -sqrt(3*${tmp}/12.01*1000*${abg}*${boltz})*0.01
+variable tar equal random(-${cell2},${cell2},${seed})
+
+fix 1 metal nvt temp ${tmp} ${tmp} $(100.0*dt)
+fix 2 carbon nve
+fix 3 metal recenter 0.0 0.0 0.0
+#fix 5 metal momentum 100 angular rescale
+
+compute 1 carbon coord/atom cutoff 2.0 group carbon
+compute 2 carbon coord/atom cutoff 3.0 group metal
+compute 5 carbon pe/atom 
+
+dump		1 all custom 40000 pos.lammpstrj id type xs ys zs c_5 c_1 c_2
+dump        2 all custom 40000 vel.lammpstrj id vx vy vz
+dump        3 all custom 400 cood.txt id c_1 c_2
+
+run 0
+
+group iclus type 2
+variable c1 atom "c_1 + c_2 == 0"
+group g1 variable c1
+group g2 intersect carbon g1
+group g3 subtract iclus g1
+group g4 subtract g2 iclus
+variable nclus equal count(g2)
+
+thermo $(400*100)
+thermo_style custom step temp etotal pe ke press v_nclus
+thermo_modify line one
+
+variable flag equal 0
+
+label  loopa
+variable a loop 2
+ label loopb
+ variable b loop 200
+ 
+ group g1 delete 
+ group g2 delete
+ group g3 delete
+ group g4 delete
+ group iclus delete
+ 
+ group iclus type 2
+ variable c1 atom "c_1 + c_2 == 0"
+ group g1 variable c1
+ group g2 intersect carbon g1
+ group g3 subtract iclus g1
+ group g4 subtract g2 iclus  
+ 
+ variable nclus equal count(g2)
+ variable clus equal count(g3)
+ variable sepcarbon equal count(g4)
+
+  if "${b} != 200" then &
+   "jump SELF notb"
+  if "${nclus} < ${maxnclus}" then &  
+   "fix 4 carbon deposit 1 2 1 ${seed} region 1 near 3.0 vz ${vel} ${vel} target ${tar} ${tar} ${tar}" & 
+   "variable flag equal 1"
+  label notb
+  run 0
+  if "${clus} != 0" then &
+   "set group g3 type 1" 
+  if "${sepcarbon} != 0" then &
+   "set group g4 type 2"  
+  run 400
+  if "${flag} == 1" then &
+   "unfix 4" &
+   "variable flag equal 0"
+  
+ next b 
+ jump SELF loopb
+ label break
+ variable b delete
+
+  variable f1 equal temp
+  variable f2 equal pe
+  variable f3 equal ke
+  variable f4 equal etotal
+  variable f5 equal v_nclus
+  variable timestep equal step
+  print "${timestep} ${f1} ${f2} ${f3} ${f4} ${f5}" append thermo.dat screen no
+
+next a
+jump SELF loopa 
+label       break
+variable    a delete
+
+write_restart restart.tersoff
+
+
