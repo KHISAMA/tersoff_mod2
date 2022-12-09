@@ -7,7 +7,10 @@ LAMMPS implementation of the interatomic potential of C-Fe and C-Co system for s
 
 The related works have published in Journal of Physical Chemistry C and ACS Nano:
 
-
+Kaoru Hisama, Ryo Yoshikawa, Teppei Matsuo, Takuya Noguchi, Tomoya Kawasuzuki, Shohei Chiashi, and Shigeo Maruyama. 
+Growth analysis of single-walled carbon nanotubes based on interatomic potential by molecular dynamics simulation.
+The Journal of Physical Chemistry C, 122(17):9648–9653, 2018.
+DOI: <https://doi.org/10.1021/acs.jpcc.7b12687>
 
 Ryo Yoshikawa, Kaoru Hisama, Hiroyuki Ukai, Yukai Takagi, Taiki Inoue, Shohei Chiashi, and Shigeo Maruyama.
 Molecular dynamics of chirality definable growth of single-walled carbon nanotubes. ACS Nano, 13(6):6506–6512, 2019.
