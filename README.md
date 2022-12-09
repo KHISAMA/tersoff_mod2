@@ -32,7 +32,7 @@ To compile:
 Note
 -----
 
-We have tested this package in LAMMPS 23 Jun 2022 version.  
+We have tested this implementation in LAMMPS 23 Jun 2022 version.  
 It may not work in some environments/versions.
 
 
