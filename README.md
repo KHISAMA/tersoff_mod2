@@ -11,7 +11,7 @@ The related works have published in Journal of Physical Chemistry C and ACS Nano
 
 Ryo Yoshikawa, Kaoru Hisama, Hiroyuki Ukai, Yukai Takagi, Taiki Inoue, Shohei Chiashi, and Shigeo Maruyama.
 Molecular dynamics of chirality definable growth of single-walled carbon nanotubes. ACS Nano, 13(6):6506–6512, 2019.
-DOI: <https://doi:10.1021/acsnano.8b09754>
+DOI: <https://doi.org/10.1021/acsnano.8b09754>
 
 
 
