@@ -1,7 +1,7 @@
 pair tersoff_mod2
 ==============
 
-_Hisama Kaoru, Ryo Yoshikawa, Ikuma Kohata_
+_Kaoru Hisama, Ryo Yoshikawa, Ikuma Kohata_
 
 LAMMPS implementation of the interatomic potential of C-Fe and C-Co system for single-walled carbon nanotube growth by CVD synthesis.  
 
